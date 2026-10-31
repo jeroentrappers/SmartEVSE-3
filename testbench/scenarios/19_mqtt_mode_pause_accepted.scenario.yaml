@@ -1,0 +1,17 @@
+# /Set/Mode "Pause" was silently dropped by the pre-migration harness
+# (the old string table only covered Off/Normal/Smart/Solar). The
+# firmware actually accepts "Pause" and calls setAccess(PAUSE), cutting
+# access without touching the Mode variable. Migration to
+# evse::limits::decide_set_mode aligned both sides. Pin that here:
+# after "Pause" the snapshot still shows the last Mode (Smart), but the
+# firmware's access state is now off — proven by plugging an EV in and
+# nudging pilot to 6V: B stays B, contactor never closes.
+steps:
+  - {"cmd": "reset"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/Mode", "payload": "Pause"}
+  - {"cmd": "set_mains", "l1": 5.0, "l2": 5.0, "l3": 5.0}
+  - {"cmd": "plug_ev", "connected": true}
+  - {"cmd": "tick", "ms": 500}
+  - {"cmd": "set_pilot_mv", "mv": 6000}
+  - {"cmd": "tick", "ms": 1000}
+  - {"cmd": "snapshot"}

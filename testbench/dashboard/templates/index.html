@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SmartEVSE testbench</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+<header>
+  <h1>SmartEVSE testbench</h1>
+  <div class="badges">
+    <span class="badge" id="b-state">STATE ?</span>
+    <span class="badge" id="b-mode">Mode ?</span>
+    <span class="badge" id="b-time">t=0 ms</span>
+    <span class="badge error hidden" id="b-error">—</span>
+  </div>
+  <div class="toolbar">
+    <button data-cmd='{"cmd":"reset"}'>reset</button>
+    <button id="rec-start">● rec</button>
+    <button id="rec-stop" disabled>■ stop & export</button>
+  </div>
+</header>
+
+<main>
+  <!-- Inputs ------------------------------------------------------- -->
+  <section class="inputs">
+    <h2>Inputs</h2>
+
+    <fieldset>
+      <legend>Clock</legend>
+      <div class="row">
+        <button data-cmd='{"cmd":"tick","ms":100}'>tick 100 ms</button>
+        <button data-cmd='{"cmd":"tick","ms":1000}'>tick 1 s</button>
+        <button data-cmd='{"cmd":"tick","ms":5000}'>tick 5 s</button>
+        <button data-cmd='{"cmd":"tick","ms":60000}'>tick 1 min</button>
+      </div>
+      <div class="row">
+        <label>auto-play
+          <select id="autoplay">
+            <option value="0">off</option>
+            <option value="1">1×</option>
+            <option value="10">10×</option>
+            <option value="100">100×</option>
+          </select>
+        </label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>EV / Pilot</legend>
+      <div class="row">
+        <label><input type="checkbox" id="plug"> EV plugged in</label>
+      </div>
+      <div class="row">
+        <label>Pilot voltage
+          <input type="range" id="pilot" min="0" max="12000" step="100" value="12000">
+          <output id="pilot-out">12000 mV</output>
+        </label>
+      </div>
+      <div class="row">
+        <button data-pilot="12000">12 V (A)</button>
+        <button data-pilot="9000">9 V (B)</button>
+        <button data-pilot="6000">6 V (C)</button>
+        <button data-pilot="3000">3 V (D)</button>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Mode & current</legend>
+      <div class="row">
+        <label>Mode
+          <select id="mode">
+            <option>Off</option><option>Normal</option>
+            <option>Solar</option><option selected>Smart</option>
+          </select>
+        </label>
+      </div>
+      <div class="row">
+        <label>MQTT Set/CurrentOverride (dA)
+          <input type="number" id="override" min="0" max="9999" step="10" value="0">
+        </label>
+        <button id="send-override">send</button>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Mains meter</legend>
+      <div class="row">
+        <label>L1 (A) <input type="range" id="l1" min="0" max="40" step="0.1" value="0"><output id="l1-out">0.0</output></label>
+      </div>
+      <div class="row">
+        <label>L2 (A) <input type="range" id="l2" min="0" max="40" step="0.1" value="0"><output id="l2-out">0.0</output></label>
+      </div>
+      <div class="row">
+        <label>L3 (A) <input type="range" id="l3" min="0" max="40" step="0.1" value="0"><output id="l3-out">0.0</output></label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Safety</legend>
+      <div class="row">
+        <button class="danger" data-cmd='{"cmd":"rcm_trip"}'>RCM trip</button>
+        <button data-cmd='{"cmd":"rcm_clear"}'>clear RCM</button>
+      </div>
+      <div class="row">
+        <label><input type="checkbox" id="ext-switch"> external emergency switch</label>
+      </div>
+      <div class="row">
+        <label>Temperature (°C)
+          <input type="range" id="temp" min="-10" max="100" step="1" value="25">
+          <output id="temp-out">25</output>
+        </label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>MQTT Set/*</legend>
+      <div class="row">
+        <input type="text" id="mqtt-topic" placeholder="SmartEVSE-12345/Set/Mode" size="32">
+      </div>
+      <div class="row">
+        <input type="text" id="mqtt-payload" placeholder="Smart" size="32">
+        <button id="send-mqtt">send</button>
+      </div>
+    </fieldset>
+  </section>
+
+  <!-- Outputs ------------------------------------------------------ -->
+  <section class="outputs">
+    <h2>Outputs</h2>
+
+    <div class="cards">
+      <div class="card contactor" id="card-contactor">
+        <div class="card-title">Contactor</div>
+        <div class="contactor-phases">
+          <span class="phase" id="ph1">L1</span>
+          <span class="phase" id="ph2">L2</span>
+          <span class="phase" id="ph3">L3</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">CP PWM</div>
+        <div class="big" id="pwm">0%</div>
+        <div class="sub" id="pwm-sub">advertised —</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Charge current</div>
+        <div class="big" id="ichg">0.0 A</div>
+        <div class="sub" id="ichg-sub">target —</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Errors</div>
+        <div class="flags" id="flags">none</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>State transitions</h3>
+      <ol class="transitions" id="transitions"></ol>
+    </div>
+
+    <div class="panel">
+      <h3>MQTT publishes <small>(retained)</small></h3>
+      <table class="mqtt">
+        <thead><tr><th>topic</th><th>payload</th></tr></thead>
+        <tbody id="mqtt-body"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<!-- Event log ----------------------------------------------------- -->
+<section class="log">
+  <header>
+    <h2>Event log</h2>
+    <div class="log-controls">
+      <label><input type="checkbox" id="filter-tick" checked> show ticks</label>
+      <button id="clear-log">clear</button>
+    </div>
+  </header>
+  <ol id="log-body"></ol>
+</section>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

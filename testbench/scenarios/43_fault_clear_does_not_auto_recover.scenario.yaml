@@ -1,0 +1,25 @@
+# After a fault drives the state machine into B1, the fault bit
+# clearing on its own must NOT auto-recover. The state machine is
+# the latch — error_flags tracks the instantaneous signal, but the
+# only way out of B1 is a pilot-driven transition (PILOT_12V → A,
+# i.e. the user unplugs).
+#
+# Regression target: a refactor that moves the fault check to the
+# state-transition switch instead of leaving it as a forced transition
+# might accidentally reset state when the error clears. The on_error
+# edge still fires (set=false) so callers can surface "fault cleared,
+# awaiting user reset" — but the state event stream does not.
+steps:
+  - {"cmd": "reset"}
+  - {"cmd": "set_mode", "mode": "Smart"}
+  - {"cmd": "set_mains", "l1": 5.0, "l2": 5.0, "l3": 5.0}
+  - {"cmd": "plug_ev", "connected": true}
+  - {"cmd": "tick", "ms": 500}
+  - {"cmd": "set_pilot_mv", "mv": 6000}
+  - {"cmd": "tick", "ms": 500}
+  - {"cmd": "rcm_trip"}
+  - {"cmd": "tick", "ms": 7000}
+  - {"cmd": "snapshot"}
+  - {"cmd": "rcm_clear"}
+  - {"cmd": "tick", "ms": 1000}
+  - {"cmd": "snapshot"}

@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SmartEVSE simulator — {{ device.serial }}</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+         margin: 2rem auto; max-width: 960px; padding: 0 1rem; line-height: 1.45; }
+  h1 { margin-bottom: 0.25rem; }
+  .sub { color: #888; margin-top: 0; }
+  section { margin-top: 2rem; padding: 1rem 1.25rem; border: 1px solid #ccc3;
+            border-radius: 8px; background: #0001; }
+  section h2 { margin-top: 0; font-size: 1.05rem; letter-spacing: 0.02em;
+               text-transform: uppercase; color: #888; }
+  form.inline { display: inline; }
+  button, input[type=submit] { padding: 0.4rem 0.9rem; border-radius: 6px;
+    border: 1px solid #8885; background: #fff1; cursor: pointer; }
+  button:hover { background: #fff3; }
+  input, select { padding: 0.35rem 0.5rem; border-radius: 6px;
+    border: 1px solid #8885; background: #fff1; font: inherit; }
+  .row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr));
+          gap: 0.5rem 1.5rem; }
+  .grid div { border-bottom: 1px dashed #8884; padding: 0.2rem 0; }
+  .grid .k { color: #888; font-size: 0.85rem; }
+  .grid .v { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .events { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-size: 0.85rem; max-height: 240px; overflow: auto; background: #0002;
+            padding: 0.75rem; border-radius: 6px; }
+  .pill { display: inline-block; padding: 0.15rem 0.55rem; border-radius: 999px;
+          font-size: 0.8rem; background: #8884; }
+  .pill.on { background: #2a8; color: #fff; }
+  .pill.off { background: #844; color: #fff; }
+</style>
+</head>
+<body>
+<h1>SmartEVSE simulator</h1>
+<p class="sub">
+  Serial <code>{{ device.serial }}</code> ·
+  MQTT prefix <code>{{ prefix }}</code> ·
+  Broker <code>{{ mqtt_host }}:{{ mqtt_port }}</code>
+  <span class="pill {{ 'on' if device.is_connected() else 'off' }}">{{ device.state_name() }}</span>
+</p>
+
+<section>
+  <h2>Session</h2>
+  <div class="row">
+    <form class="inline" method="post" action="/control/plug"><button>Plug in EV</button></form>
+    <form class="inline" method="post" action="/control/unplug"><button>Unplug EV</button></form>
+    <form class="inline" method="post" action="/control/start"><button>Start charging</button></form>
+    <form class="inline" method="post" action="/control/stop"><button>Stop charging</button></form>
+  </div>
+</section>
+
+<section>
+  <h2>Mode & current</h2>
+  <div class="row">
+    <form class="inline" method="post" action="/control/mode">
+      <label>Mode
+        <select name="mode">
+          {% for m in modes %}
+          <option value="{{ m }}" {% if m == device.mode %}selected{% endif %}>{{ m }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <button>Set mode</button>
+    </form>
+    <form class="inline" method="post" action="/control/override">
+      <label>Override current (A)
+        <input type="number" name="amps" min="0" max="{{ device.max_current_a }}"
+               step="1" value="{{ (device.charge_current_override_da // 10) }}">
+      </label>
+      <button>Set override</button>
+    </form>
+  </div>
+</section>
+
+<section>
+  <h2>Errors</h2>
+  <div class="row">
+    <form class="inline" method="post" action="/control/error">
+      <label>Trigger error
+        <input type="text" name="error" placeholder="e.g. Temperature High" value="">
+      </label>
+      <button>Set error</button>
+    </form>
+    <form class="inline" method="post" action="/control/reset"><button>Clear error</button></form>
+    <span>current: <code>{{ device.error }}</code></span>
+  </div>
+</section>
+
+<section>
+  <h2>Currently published topics</h2>
+  <div class="grid">
+    {% for k, v in payloads.items() %}
+    <div><div class="k">{{ prefix }}/{{ k }}</div><div class="v">{{ v }}</div></div>
+    {% endfor %}
+  </div>
+</section>
+
+<section>
+  <h2>Recent events</h2>
+  <div class="events">
+    {% for ts, msg in events %}<div>{{ ts }} &nbsp; {{ msg }}</div>{% else %}<em>No events yet.</em>{% endfor %}
+  </div>
+</section>
+
+<script>
+  // Cheap auto-refresh so the page stays live while the simulator ticks.
+  setTimeout(() => location.reload(), 3000);
+</script>
+</body>
+</html>

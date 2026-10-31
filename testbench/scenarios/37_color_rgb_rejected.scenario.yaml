@@ -1,0 +1,18 @@
+# /Set/Color* reject paths — seed ColorOff with a valid value first
+# (1,2,3 dec), then fire five reject shapes at ColorOff and confirm
+# the snapshot value is unchanged after all rejects:
+#   "256,0,0"     : out-of-range upper (256 is exclusive)
+#   "-1,0,0"      : negative channel
+#   "10,20"       : too few fields
+#   "10:20:30"    : wrong separator (sscanf/firmware used ',')
+#   ""            : empty payload
+steps:
+  - {"cmd": "reset"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/ColorOff", "payload": "1,2,3"}
+  - {"cmd": "snapshot"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/ColorOff", "payload": "256,0,0"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/ColorOff", "payload": "-1,0,0"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/ColorOff", "payload": "10,20"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/ColorOff", "payload": "10:20:30"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/ColorOff", "payload": ""}
+  - {"cmd": "snapshot"}

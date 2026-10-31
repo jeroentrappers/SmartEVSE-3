@@ -1,0 +1,16 @@
+# /Set/EVMeter reject paths — four payloads the helper must drop:
+#   "1:2:3:4"     : only 4 fields (need exactly 5)
+#   "a:b:c:d:e"   : non-numeric fields
+#   ""            : empty
+#   "1:2:3:4:5" with ev_meter_em_api=false : meter not API-configured
+# After each reject, no ev_meter event fires; the pre-set EV meter
+# values (seeded via "100:200:300:3500:42000") stay in the snapshot.
+steps:
+  - {"cmd": "reset"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/EVMeter", "payload": "100:200:300:3500:42000"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/EVMeter", "payload": "1:2:3:4"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/EVMeter", "payload": "a:b:c:d:e"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/EVMeter", "payload": ""}
+  - {"cmd": "set_ev_meter_em_api", "on": false}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/EVMeter", "payload": "1:2:3:4:5"}
+  - {"cmd": "snapshot"}

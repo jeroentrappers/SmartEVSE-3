@@ -49,6 +49,7 @@ char RequiredEVCCID[32] = "";                                               // R
 #include "OneWireESP32.h"
 #include "modbus.h"
 #include "meter.h"
+#include "firmware_core_shim.h"
 
 //OCPP includes
 #include <MicroOcpp.h>
@@ -480,55 +481,69 @@ void writeMqttCaCert(const String& cert) {
 #if MQTT
 void mqtt_receive_callback(const String topic, const String payload) {
     if (topic == MQTTprefix + "/Set/Mode") {
-        if (payload == "Off") {
-            setAccess(OFF);
-        } else if (payload == "Normal") {
-            setMode(MODE_NORMAL);
-        } else if (payload == "Solar") {
-            setOverrideCurrent(0);
-            setMode(MODE_SOLAR);
-        } else if (payload == "Smart") {
-            setMode(MODE_SMART);
-        } else if (payload == "Pause") {
-            setAccess(PAUSE);
+        uint8_t target = 0;
+        uint8_t action = evse_limits_decide_set_mode(
+            payload.c_str(),
+            static_cast<uint32_t>(payload.length()),
+            &target);
+        if (action == 2 /*ApplyAccess*/) {
+            setAccess(static_cast<AccessStatus_t>(target));
+        } else if (action == 1 /*ApplyMode*/) {
+            // Solar has a side effect — clear OverrideCurrent before the
+            // mode switch, matching the legacy inline ordering.
+            if (target == MODE_SOLAR) setOverrideCurrent(0);
+            setMode(target);
         }
+        // action == 0 (Reject) → silent drop, matches legacy behavior.
     } else if (topic == MQTTprefix + "/Set/CustomButton") {
-        if (payload == "On") {
-            CustomButton = true;
-        } else {
-            CustomButton = false;
-        }
+        // Admission via extracted helper. Always-Apply 2-state toggle:
+        // "On" → 1, anything else → 0 (bit-identical to legacy).
+        uint8_t v = 0;
+        (void)evse_limits_decide_custom_button(
+            payload.c_str(),
+            static_cast<uint32_t>(payload.length()),
+            &v);
+        CustomButton = (v != 0);
     } else if (topic == MQTTprefix + "/Set/CurrentOverride") {
-        uint16_t RequestedCurrent = payload.toInt();
-        if (RequestedCurrent == 0) {
-            setOverrideCurrent(0);
-        } else if (LoadBl < 2 && (Mode == MODE_NORMAL || Mode == MODE_SMART)) { // OverrideCurrent not possible on Slave
-            if (RequestedCurrent >= (MinCurrent * 10) && RequestedCurrent <= (MaxCurrent * 10)) {
-                setOverrideCurrent(RequestedCurrent);
-            }
-        }
-    } else if (topic == MQTTprefix + "/Set/CurrentMaxSumMains" && LoadBl < 2) {
-        uint16_t RequestedCurrent = payload.toInt();
-        if (RequestedCurrent == 0) {
-            MaxSumMains = 0;
-        } else if (RequestedCurrent == 0 || (RequestedCurrent >= 10 && RequestedCurrent <= 600)) {
-                MaxSumMains = RequestedCurrent;
-        }
+        uint16_t accepted_dA = 0;
+        uint8_t action = evse_limits_decide_current_override(
+            payload.toInt(),
+            MinCurrent * 10,
+            MaxCurrent * 10,
+            LoadBl,
+            Mode,
+            &accepted_dA);
+        if (action == 1) setOverrideCurrent(0);
+        else if (action == 2) setOverrideCurrent(accepted_dA);
+        // action == 0 (Reject) → silently drop, matches legacy behavior
+    } else if (topic == MQTTprefix + "/Set/CurrentMaxSumMains") {
+        uint16_t accepted_a = 0;
+        uint8_t action = evse_limits_decide_max_sum_mains(
+            payload.toInt(), LoadBl, &accepted_a);
+        if (action == 1) MaxSumMains = 0;
+        else if (action == 2) MaxSumMains = accepted_a;
+        // action == 0 (Reject) → silently drop, matches legacy behavior
     } else if (topic == MQTTprefix + "/Set/CPPWMOverride") {
-        int pwm = payload.toInt();
-        if (pwm == -1) {
+        uint16_t accepted_duty = 0;
+        uint8_t action = evse_limits_decide_cp_pwm_override(
+            payload.toInt(), &accepted_duty);
+        if (action == 1) {
+            // Clear: release override, restore normal PWM.
             SetCPDuty(1024);
             PILOT_CONNECTED;
             CPDutyOverride = false;
-        } else if (pwm == 0) {
-            SetCPDuty(0);
-            PILOT_DISCONNECTED;
-            CPDutyOverride = true;
-        } else if (pwm <= 1024) {
-            SetCPDuty(pwm);
-            PILOT_CONNECTED;
+        } else if (action == 2) {
+            // Apply: write raw 1024-scale duty; pilot follows duty>0.
+            SetCPDuty(accepted_duty);
+            if (accepted_duty > 0) {
+                PILOT_CONNECTED;
+            } else {
+                PILOT_DISCONNECTED;
+            }
             CPDutyOverride = true;
         }
+        // action == 0 (Reject) → silently drop; the legacy code UB'd on
+        // pwm < -1 via uint32_t conversion. See FEEDBACK §8.
     } else if (topic == MQTTprefix + "/Set/MainsMeter") {
         if (MainsMeter.Type != EM_API || LoadBl >= 2)
             return;
@@ -607,143 +622,96 @@ void mqtt_receive_callback(const String topic, const String payload) {
                 CircuitMeter.Timeout = COMM_CIRCTIMEOUT;
         }
     } else if (topic == MQTTprefix + "/Set/HomeBatteryCurrent") {
-        if (LoadBl >= 2)
-            return;
-        homeBatteryCurrent = payload.toInt();
-        homeBatteryLastUpdate = time(NULL);
+        // Admission via extracted helper. Legacy accepted non-numeric as
+        // 0 and advanced the timestamp anyway (FEEDBACK §10); tightened
+        // here — parse fail / slave now reject.
+        int16_t hb = 0;
+        uint8_t action = evse_limits_decide_home_battery_current(
+            payload.c_str(),
+            static_cast<uint32_t>(payload.length()),
+            LoadBl,
+            &hb);
+        if (action == 2 /*Apply*/) {
+            homeBatteryCurrent = hb;
+            homeBatteryLastUpdate = time(NULL);
+        }
 #if MODEM
     } else if (topic == MQTTprefix + "/Set/RequiredEVCCID") {
         strncpy(RequiredEVCCID, payload.c_str(), sizeof(RequiredEVCCID));
         shadowPrefs.markString("RequiredEVCCID", &RequiredEVCCID);
 #endif
-    } else if (topic == MQTTprefix + "/Set/ColorOff") {
-        int32_t R, G, B;
-        int n = sscanf(payload.c_str(), "%d,%d,%d", &R, &G, &B);
-
-        // R,G,B is between 0..255
-        if (n == 3 && (R >= 0 && R < 256) && (G >= 0 && G < 256) && (B >= 0 && B < 256)) {
-            ColorOff[0] = R;
-            ColorOff[1] = G;
-            ColorOff[2] = B;
+    } else if (topic == MQTTprefix + "/Set/ColorOff"
+            || topic == MQTTprefix + "/Set/ColorNormal"
+            || topic == MQTTprefix + "/Set/ColorSmart"
+            || topic == MQTTprefix + "/Set/ColorSolar"
+            || topic == MQTTprefix + "/Set/ColorCustom") {
+        // Admission via extracted helper (evse::limits::decide_color_rgb).
+        // Five topics, one policy: "R,G,B" with each channel in [0, 256).
+        // The legacy sscanf accepted the same set on valid canonical
+        // input; whitespace tolerance is dropped (see evse_limits.cpp).
+        uint8_t r = 0, g = 0, b = 0;
+        uint8_t action = evse_limits_decide_color_rgb(
+            payload.c_str(),
+            static_cast<uint32_t>(payload.length()),
+            &r, &g, &b);
+        if (action == 2 /*Apply*/) {
+            uint8_t* target = nullptr;
+            if (topic == MQTTprefix + "/Set/ColorOff")         target = ColorOff;
+            else if (topic == MQTTprefix + "/Set/ColorNormal") target = ColorNormal;
+            else if (topic == MQTTprefix + "/Set/ColorSmart")  target = ColorSmart;
+            else if (topic == MQTTprefix + "/Set/ColorSolar")  target = ColorSolar;
+            else if (topic == MQTTprefix + "/Set/ColorCustom") target = ColorCustom;
+            if (target) { target[0] = r; target[1] = g; target[2] = b; }
         }
-    } else if (topic == MQTTprefix + "/Set/ColorNormal") {
-        int32_t R, G, B;
-        int n = sscanf(payload.c_str(), "%d,%d,%d", &R, &G, &B);
-
-        // R,G,B is between 0..255
-        if (n == 3 && (R >= 0 && R < 256) && (G >= 0 && G < 256) && (B >= 0 && B < 256)) {
-            ColorNormal[0] = R;
-            ColorNormal[1] = G;
-            ColorNormal[2] = B;
-        }
-    } else if (topic == MQTTprefix + "/Set/ColorSmart") {
-        int32_t R, G, B;
-        int n = sscanf(payload.c_str(), "%d,%d,%d", &R, &G, &B);
-
-        // R,G,B is between 0..255
-        if (n == 3 && (R >= 0 && R < 256) && (G >= 0 && G < 256) && (B >= 0 && B < 256)) {
-            ColorSmart[0] = R;
-            ColorSmart[1] = G;
-            ColorSmart[2] = B;
-        }
-    } else if (topic == MQTTprefix + "/Set/ColorSolar") {
-        int32_t R, G, B;
-        int n = sscanf(payload.c_str(), "%d,%d,%d", &R, &G, &B);
-
-        // R,G,B is between 0..255
-        if (n == 3 && (R >= 0 && R < 256) && (G >= 0 && G < 256) && (B >= 0 && B < 256)) {
-            ColorSolar[0] = R;
-            ColorSolar[1] = G;
-            ColorSolar[2] = B;
-        }
-    } else if (topic == MQTTprefix + "/Set/ColorCustom") {
-        int32_t R, G, B;
-        int n = sscanf(payload.c_str(), "%d,%d,%d", &R, &G, &B);
-
-        // R,G,B is between 0..255
-        if (n == 3 && (R >= 0 && R < 256) && (G >= 0 && G < 256) && (B >= 0 && B < 256)) {
-            ColorCustom[0] = R;
-            ColorCustom[1] = G;
-            ColorCustom[2] = B;
-        }
+        // action == 0 (Reject) → silent drop, matches legacy behavior.
     } else if (topic == MQTTprefix + "/Set/CableLock") {
-        if (payload == "1") {
-            CableLock = 1;
-        } else {
-            CableLock = 0;
+        // Admission via extracted helper. Helper accepts exactly
+        // { "0", "1" }; legacy accepted anything, treating unknown as 0.
+        // Unconditional request_write_settings() is preserved for
+        // bit-identity — see FEEDBACK §11 (flash-write-on-garbage is
+        // MQTT-reachable, same pattern as EnableC2 §9).
+        uint8_t cl = 0;
+        uint8_t action = evse_limits_decide_cable_lock(
+            payload.c_str(),
+            static_cast<uint32_t>(payload.length()),
+            &cl);
+        if (action == 2 /*Apply*/) {
+            CableLock = cl;
         }
         shadowPrefs.markUChar("CableLock", &CableLock);
     } else if (topic == MQTTprefix + "/Set/EnableC2") {
-        // for backwards compatibility we accept both 0-4 as string argument:
-        //{ "Not present", "Always Off", "Solar Off", "Always On", "Auto" }
-        uint8_t value;
-        if (isdigit(payload[0])) {
-            value = payload.toInt();
-            if (value <=4) { //value is always >=0 because unsigned
-                EnableC2 = (EnableC2_t) value;
-            }
-        } else {
-            bool found=false;
-            for (value=0; value<5; value++)
-                if (payload == StrEnableC2[value]) {
-                    found = true;
-                    break;
-                }
-            if (found)
-                EnableC2 = (EnableC2_t) value;
+        uint16_t accepted = 0;
+        uint8_t action = evse_limits_decide_enable_c2(
+            payload.c_str(),
+            static_cast<uint32_t>(payload.length()),
+            &accepted);
+        if (action == 2 /*Apply*/) {
+            EnableC2 = (EnableC2_t) accepted;
         }
+        // action == 0 (Reject) → silent drop. Upstream marks the pref unconditionally,
+        // also on rejected input (FEEDBACK §9).
         shadowPrefs.markUShort("EnableC2", &EnableC2);
     } else if (topic == MQTTprefix + "/Set/RFID") {
-        // Accept RFID card via MQTT to start/stop session
-        // Payload should be hex string: 12 or 14 characters for 6 or 7 byte UID
-        // Examples: "010203040506" (6 bytes) or "01020304050607" (7 bytes)
+        // Admission via extracted helper. Accepts hex strings of length
+        // 12 (6-byte UID, family prefix 0x01) or 14 (7-byte UID); reader
+        // must be enabled. Helper trims whitespace and computes the
+        // Dallas CRC-8 into uid[7] so we can memcpy directly into RFID[].
         uint8_t RFIDReader = getItemValue(MENU_RFIDREADER);
-        if (!RFIDReader) {
+        uint8_t uid[8] = {0};
+        uint8_t action = evse_limits_decide_rfid_uid(
+            payload.c_str(),
+            static_cast<uint32_t>(payload.length()),
+            RFIDReader ? 1 : 0,
+            uid);
+        if (action == 2 /*Apply*/) {
+            memcpy(RFID, uid, 8);
+            _LOG_A("RFID received via MQTT: %s\n", payload.c_str());
+            RFIDstatus = 0;
+            CheckRFID();
+        } else if (!RFIDReader) {
             _LOG_A("RFID reader not enabled, ignoring MQTT RFID\n");
         } else {
-            String hexString = payload;
-            hexString.trim();
-
-            // Check if payload is valid hex and correct length
-            bool validHex = true;
-            for (size_t i = 0; i < hexString.length(); i++) {
-                if (!isxdigit(hexString[i])) {
-                    validHex = false;
-                    break;
-                }
-            }
-
-            if (!validHex) {
-                _LOG_A("Invalid RFID hex string received via MQTT: %s\n", hexString.c_str());
-            } else if (hexString.length() == 12 || hexString.length() == 14) {
-                // Parse hex string into RFID array
-                memset(RFID, 0, 8);
-
-                if (hexString.length() == 12) {
-                    // 6 byte UID (old reader format, starts at RFID[1])
-                    RFID[0] = 0x01; // Family code for old reader
-                    for (int i = 0; i < 6; i++) {
-                        RFID[i + 1] = (uint8_t)strtol(hexString.substring(i * 2, i * 2 + 2).c_str(), NULL, 16);
-                    }
-                    RFID[7] = crc8((unsigned char *)RFID, 7);
-                } else {
-                    // 7 byte UID (new reader format)
-                    for (int i = 0; i < 7; i++) {
-                        RFID[i] = (uint8_t)strtol(hexString.substring(i * 2, i * 2 + 2).c_str(), NULL, 16);
-                    }
-                    RFID[7] = crc8((unsigned char *)RFID, 7);
-                }
-
-                _LOG_A("RFID received via MQTT: %s\n", hexString.c_str());
-
-                // Reset RFIDstatus so CheckRFID processes the card as new
-                RFIDstatus = 0;
-
-                // Process RFID using existing logic (whitelist check, OCPP, etc.)
-                CheckRFID();
-            } else {
-                _LOG_A("Invalid RFID length received via MQTT (expected 12 or 14 hex chars): %s\n", hexString.c_str());
-            }
+            _LOG_A("Invalid RFID payload via MQTT (expected 12 or 14 hex chars): %s\n", payload.c_str());
         }
     }
 

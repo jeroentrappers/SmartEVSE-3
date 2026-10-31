@@ -1,0 +1,32 @@
+# After a fault drives state to B1 and the fault bit clears, dropping
+# the pilot from 12 V → 9 V (without unplugging first) must NOT recover
+# to STATE_B. The state machine requires a full PILOT_12V pass-through
+# (STATE_A) before a 9 V transition is honored — scenario pins that
+# the 9 V-on-B1 branch in the pilot switch is intentionally absent.
+#
+# Regression target: an over-eager refactor that adds a B1 → B
+# transition on PILOT_9V "for symmetry" would silently let a faulted
+# session resume without the operator re-engaging the EV. The test
+# drives pilot 12→9 while still in B1, confirms no transition, then
+# goes 12→A→9→B to show the proper recovery path still works.
+steps:
+  - {"cmd": "reset"}
+  - {"cmd": "set_mode", "mode": "Smart"}
+  - {"cmd": "set_mains", "l1": 5.0, "l2": 5.0, "l3": 5.0}
+  - {"cmd": "plug_ev", "connected": true}
+  - {"cmd": "tick", "ms": 500}
+  - {"cmd": "set_pilot_mv", "mv": 6000}
+  - {"cmd": "tick", "ms": 500}
+  - {"cmd": "rcm_trip"}
+  - {"cmd": "tick", "ms": 7000}
+  - {"cmd": "rcm_clear"}
+  - {"cmd": "tick", "ms": 100}
+  - {"cmd": "snapshot"}
+  - {"cmd": "set_pilot_mv", "mv": 9000}
+  - {"cmd": "tick", "ms": 200}
+  - {"cmd": "snapshot"}
+  - {"cmd": "plug_ev", "connected": false}
+  - {"cmd": "tick", "ms": 200}
+  - {"cmd": "plug_ev", "connected": true}
+  - {"cmd": "tick", "ms": 200}
+  - {"cmd": "snapshot"}

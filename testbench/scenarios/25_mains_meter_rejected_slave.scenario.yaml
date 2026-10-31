@@ -1,0 +1,10 @@
+# /Set/MainsMeter reject-slave path — a slave (LoadBl>=2) silently
+# drops any mains payload, even a perfectly valid one. The last
+# explicitly-set mains reading is preserved in the snapshot; no
+# mains_meter event fires.
+steps:
+  - {"cmd": "reset"}
+  - {"cmd": "set_mains", "l1": 1.0, "l2": 2.0, "l3": 3.0}
+  - {"cmd": "set_load_balance", "role": 2}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/MainsMeter", "payload": "100:100:100"}
+  - {"cmd": "snapshot"}

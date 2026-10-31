@@ -1,0 +1,17 @@
+# /Set/CPPWMOverride Reject paths — three out-of-range payloads that
+# must all be silently dropped (no pwm/pilot events, no snapshot delta).
+#   2000 : above the 1024 upper bound
+#      -2 : negative beyond the -1 sentinel. The legacy inline code UB'd
+#           here by passing `-2` to SetCPDuty(uint32_t) (becomes
+#           0xFFFFFFFE). The migrated helper rejects, fixing the UB.
+#           See FEEDBACK §8.
+#   9999 : well past the upper bound — also rejected.
+# A trailing snapshot pins "no state change" against the pre-message
+# snapshot.
+steps:
+  - {"cmd": "reset"}
+  - {"cmd": "snapshot"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/CPPWMOverride", "payload": "2000"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/CPPWMOverride", "payload": "-2"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/CPPWMOverride", "payload": "9999"}
+  - {"cmd": "snapshot"}

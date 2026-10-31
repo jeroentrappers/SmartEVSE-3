@@ -1,0 +1,15 @@
+# /Set/Mode "Solar" has a side effect that's easy to regress: it must
+# call setOverrideCurrent(0) BEFORE the mode switch. Reason: an
+# operator-set override of e.g. 10A shouldn't survive a switch into
+# Solar — Solar's regulator owns the setpoint.
+#
+# This scenario: first apply an override of 100dA (10A) via
+# /Set/CurrentOverride, confirm it sticks (snapshot shows 10), then send
+# /Set/Mode=Solar. Override must be cleared (snapshot shows 0) AND
+# mode must flip to "Solar".
+steps:
+  - {"cmd": "reset"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/CurrentOverride", "payload": "100"}
+  - {"cmd": "snapshot"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/Mode", "payload": "Solar"}
+  - {"cmd": "snapshot"}

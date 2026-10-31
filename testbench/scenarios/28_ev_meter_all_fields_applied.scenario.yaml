@@ -1,0 +1,9 @@
+# /Set/EVMeter full accept path — an EM_API EV meter receives all five
+# fields in one payload (L1:L2:L3:W:WH). All three arms fire and the
+# emitted ev_meter event carries flags=7 (0x1|0x2|0x4).
+#
+# 100:200:300:3500:42000 → 10.0/20.0/30.0 A per phase, 3500 W, 42000 Wh.
+steps:
+  - {"cmd": "reset"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/EVMeter", "payload": "100:200:300:3500:42000"}
+  - {"cmd": "snapshot"}

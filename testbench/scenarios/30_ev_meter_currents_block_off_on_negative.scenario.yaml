@@ -1,0 +1,13 @@
+# /Set/EVMeter currents-block-off arm — a single negative L* field
+# blocks the WHOLE currents write (not just that field), matching the
+# firmware's `(L1 > -1 && L2 > -1 && L3 > -1)` AND-chain. The power
+# arm still applies; currents stay at their pre-reject values.
+#
+# Seed valid currents first via "40:50:60:-1:-1" (flags=1), then send
+# "-1:70:80:9000:-1" which has L1=-1 and should leave L1/L2/L3 at
+# 40/50/60 while power updates to 9000 W (flags=2).
+steps:
+  - {"cmd": "reset"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/EVMeter", "payload": "40:50:60:-1:-1"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/EVMeter", "payload": "-1:70:80:9000:-1"}
+  - {"cmd": "snapshot"}

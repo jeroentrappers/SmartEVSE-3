@@ -1,0 +1,8 @@
+# /Set/CableLock accept path — payload "1" locks, "0" unlocks. Each
+# publish fires a flash_write event (bit-identity with the legacy
+# unconditional request_write_settings() — see FEEDBACK §11).
+steps:
+  - {"cmd": "reset"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/CableLock", "payload": "1"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/CableLock", "payload": "0"}
+  - {"cmd": "snapshot"}

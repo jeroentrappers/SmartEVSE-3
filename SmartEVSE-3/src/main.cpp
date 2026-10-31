@@ -1,4 +1,5 @@
 #include "main.h"
+#include "firmware_core_shim.h"  // evse_decode_pilot_mv — IEC 61851 thresholds
 #include "stdio.h"
 #include "stdlib.h"
 #include "meter.h"
@@ -421,39 +422,46 @@ void setOverrideCurrent(uint16_t Current) { //c
  *  Check if we can switch to 1 or 3 phase charging, depending on the Enable C2 setting 
  */
 void CheckSwitchingPhases(void) {
-    // we want to obey EnableC2 settings at all times, after switching modes and/or C2 settings
-    if (EnableC2 != AUTO || Mode == MODE_SOLAR) {
-        if (Force_Single_Phase_Charging()) {                                
-            if (Nr_Of_Phases_Charging != 1) {                               // Currently charging with 3 phases
-                if (State != STATE_A) {                                 
-                    Switching_Phases_C2 = GOING_TO_SWITCH_1P;
-                    _LOG_A("Switching to 1P!!!\n");
-                } else Nr_Of_Phases_Charging = 1;                           // We are in STATE_A, just set the correct nr of phases.
-            } else {
-                Switching_Phases_C2 = NO_SWITCH;                            // Currently charging on 1 phase, no need to switch
-                _LOG_A("No need to switch to 1P !\n");
-            }
-        } else {
-            if (Nr_Of_Phases_Charging != 3) {                               // Currently charging on 1 phase
-                if (State != STATE_A) {
-                    Switching_Phases_C2 = GOING_TO_SWITCH_3P;
-                    _LOG_A("Switching to 3P!!!\n");
-                } else Nr_Of_Phases_Charging = 3;                           // We are in STATE_A, just set the correct nr of phases.
-            } else {
-                Switching_Phases_C2 = NO_SWITCH;                            // Currently charging with 3 phases, no need to switch
-                _LOG_A("No need to switch to 3P !\n");
-            }
-        }
-    } else if (Mode == MODE_SMART) {                                        // SMART mode with CONTACT 2 set to AUTO
-            if (Nr_Of_Phases_Charging != 3) {                               // in SMART AUTO mode go back to the old 3P
-                Switching_Phases_C2 = GOING_TO_SWITCH_3P;
-                _LOG_A("AUTO Switching to 3P\n");
-            } else if (Switching_Phases_C2 != NO_SWITCH) {
-                Switching_Phases_C2 = NO_SWITCH;                            // Was about to switch phases, but cancelled now
-                _LOG_A("Switching Cancelled!\n");
-            }   
-    } 
-    _LOG_D("NrPhasesCharging:%u\n",Nr_Of_Phases_Charging); 
+    uint8_t reason = evse_check_switching_phases(
+        static_cast<uint8_t>(EnableC2),
+        Mode,
+        State,
+        Nr_Of_Phases_Charging,
+        static_cast<uint8_t>(Switching_Phases_C2));
+    switch (reason) {
+        case 0: break;  // PSR_NOOP
+        case 1:         // PSR_STAGE_1P
+            Switching_Phases_C2 = GOING_TO_SWITCH_1P;
+            _LOG_A("Switching to 1P!!!\n");
+            break;
+        case 2:         // PSR_ALREADY_1P
+            Switching_Phases_C2 = NO_SWITCH;
+            _LOG_A("No need to switch to 1P !\n");
+            break;
+        case 3:         // PSR_STAGE_3P
+            Switching_Phases_C2 = GOING_TO_SWITCH_3P;
+            _LOG_A("Switching to 3P!!!\n");
+            break;
+        case 4:         // PSR_ALREADY_3P
+            Switching_Phases_C2 = NO_SWITCH;
+            _LOG_A("No need to switch to 3P !\n");
+            break;
+        case 5:         // PSR_SET_1P_IMMEDIATE
+            Nr_Of_Phases_Charging = 1;
+            break;
+        case 6:         // PSR_SET_3P_IMMEDIATE
+            Nr_Of_Phases_Charging = 3;
+            break;
+        case 7:         // PSR_AUTO_STAGE_3P
+            Switching_Phases_C2 = GOING_TO_SWITCH_3P;
+            _LOG_A("AUTO Switching to 3P\n");
+            break;
+        case 8:         // PSR_AUTO_CANCEL
+            Switching_Phases_C2 = NO_SWITCH;
+            _LOG_A("Switching Cancelled!\n");
+            break;
+    }
+    _LOG_D("NrPhasesCharging:%u\n", Nr_Of_Phases_Charging);
 }
 
 /**
@@ -482,26 +490,16 @@ void setMode(uint8_t NewMode) {
     // it's only the regulation algorithm that is changing...
     // EXCEPT when EnableC2 == Solar Off, because we would expect C2 to be off when in Solar Mode and EnableC2 == Solar Off
     // and also the other way around, multiple phases might be wanted when changing from Solar to Normal or Smart
-    if (EnableC2 == SOLAR_OFF) {
-        if ((Mode != MODE_SOLAR && NewMode == MODE_SOLAR) || (Mode == MODE_SOLAR && NewMode != MODE_SOLAR)) {
-
-            // Set State to C1 or B1 to make sure CP is disconnected for 5 seconds, before switching contactors on/off
-            if (State == STATE_C) setState(STATE_C1); 
-            else if (State != STATE_C1 && State == STATE_B) setState(STATE_B1);
-            
-            _LOG_A("Disconnect CP when switching C2\n");
-        }
-    }
-
     // similar to the above, when switching between solar charging at 1P and mode change, we need to switch back to 3P
     // TODO make sure that Smart 3P -> Solar 1P also disconnects
-    if ((EnableC2 == AUTO) && (Mode != NewMode) && (Mode == MODE_SOLAR) && (Nr_Of_Phases_Charging == 1) ) {
-    
+    uint8_t mode_switch_reason = evse_decide_mode_switch_cp_reason(
+        static_cast<uint8_t>(EnableC2), Mode, NewMode, Nr_Of_Phases_Charging);
+    if (mode_switch_reason) {
         // Set State to C1 or B1 to make sure CP is disconnected for 5 seconds, before switching contactors on/off
-        if (State == STATE_C) setState(STATE_C1);
-        else if (State != STATE_C1 && State == STATE_B) setState(STATE_B1);
-
-        _LOG_A("AUTO Solar->Smart/Normal charging 1p->3p\n");
+        uint8_t mode_switch_target = evse_decide_cp_disconnect_target_on_mode_switch(State);
+        if (mode_switch_target != State) setState(mode_switch_target);
+        if (mode_switch_reason == 1) _LOG_A("Disconnect CP when switching C2\n");
+        else                         _LOG_A("AUTO Solar->Smart/Normal charging 1p->3p\n");
     }
 
     // Also check all other switching options
@@ -551,20 +549,10 @@ void setSolarStopTimer(uint16_t Timer) {
  * 1P car will always charge 1P undetermined by CONTACTOR2
  */
 uint8_t Force_Single_Phase_Charging() {
-    switch (EnableC2) {
-        case NOT_PRESENT:                                                       //no use trying to switch a contactor on that is not present
-            return 0;   //3P charging
-        case ALWAYS_OFF:
-            return 1;   //1P charging
-        case SOLAR_OFF:
-            return (Mode == MODE_SOLAR); //1P solar charging
-        case AUTO:
-            return (Nr_Of_Phases_Charging == 1);
-        case ALWAYS_ON:
-            return 0;   //3P charging
-    }
-    //in case we don't know, stick to 3P charging
-    return 0;
+    return evse_force_single_phase_charging(
+        static_cast<uint8_t>(EnableC2),
+        Mode,
+        Nr_Of_Phases_Charging);
 }
 
 
@@ -575,28 +563,19 @@ void SetCPDuty(uint32_t DutyCycle){
     CurrentPWM = DutyCycle;
 }
 
-// Set Charge Current 
+// Set Charge Current
 // Current in Amps * 10 (160 = 16A)
 void SetCurrent(uint16_t current) {
-    uint32_t DutyCycle;
-
-    if ((current >= (MIN_CURRENT * 10)) && (current <= 510)) DutyCycle = current / 0.6;
-                                                                            // calculate DutyCycle from current
-    else if ((current > 510) && (current <= 800)) DutyCycle = (current / 2.5) + 640;
-    else DutyCycle = 100;                                                   // invalid, use 6A
-    DutyCycle = DutyCycle * 1024 / 1000;                                    // conversion to 1024 = 100%
-    SetCPDuty(DutyCycle);
+    SetCPDuty(evse_cp_duty_for_current_v3(current, MIN_CURRENT * 10));
 }
 
 
 void setStatePowerUnavailable(void) {
-    if (State == STATE_A)
-       return;
     //State changes between A,B,C,D are caused by EV or by the user
     //State changes between x1 and x2 are created by the EVSE
     //State changes between x1 and x2 indicate availability (x2) of unavailability (x1) of power supply to the EV
-    if (State == STATE_C) setState(STATE_C1);                       // If we are charging, tell EV to stop charging
-    else if (State != STATE_C1 && State != STATE_B1) setState(STATE_B1);    // If we are not in State C1 or B1, switch to State B1
+    uint8_t target = evse_decide_state_power_unavailable(State);
+    if (target != State) setState(target);
 }
 
 
@@ -685,17 +664,13 @@ void setState(uint8_t NewState) { //c
             ActivationMode = 255;                                               // Disable ActivationMode
             LCDTimer = 0;
             // Here at State C we actually switch the contactors,
-            // and set the new Nr_Of_Phases_Charging to the new value. 
-            if (Switching_Phases_C2 == GOING_TO_SWITCH_1P) {
-                Nr_Of_Phases_Charging = 1;                                      // Set phases charging to single phase
-
-            } else if (Switching_Phases_C2 == GOING_TO_SWITCH_3P) {
-                Nr_Of_Phases_Charging = 3;                                      // Set phases charging to three phase charging
-            }
-
-            CONTACTOR1_ON;            
-            if (!Force_Single_Phase_Charging()) {                               // Force_Single_Phase_Charging will check Nr_Of_Phases_Charging when the Contact2 menu option is set to 'AUTO' 
-                CONTACTOR2_ON;                                                  // Contactor2 ON
+            // and set the new Nr_Of_Phases_Charging to the new value.
+            CONTACTOR1_ON;
+            if (evse_decide_state_c_contactor2(
+                    static_cast<uint8_t>(EnableC2), Mode,
+                    Nr_Of_Phases_Charging,
+                    static_cast<uint8_t>(Switching_Phases_C2))) {
+                CONTACTOR2_ON;
                 Nr_Of_Phases_Charging = 3;
             } else {
                 CONTACTOR2_OFF;
@@ -736,11 +711,10 @@ void setAccess(uint8_t Access) { //c
 
 void setAccess(AccessStatus_t Access) { //c
     AccessStatus = Access;
-    if (Access == OFF || Access == PAUSE) {
-        //TODO:setStatePowerUnavailable() ?
-        if (State == STATE_C) setState(STATE_C1);                               // Determine where to switch to.
-        else if (State != STATE_C1 && (State == STATE_B || State == STATE_MODEM_REQUEST || State == STATE_MODEM_WAIT || State == STATE_MODEM_DONE || State == STATE_MODEM_DENIED)) setState(STATE_B1);
-    }
+    //TODO:setStatePowerUnavailable() ?
+    uint8_t access_target = evse_decide_state_on_access_change(
+        static_cast<uint8_t>(Access), State);
+    if (access_target != State) setState(access_target);
 
     //make AccessStatus and CardOffset persistent on reboot
     shadowPrefs.markUChar("Access", &AccessStatus);
@@ -770,14 +744,10 @@ uint8_t Pilot() {
     }
     //_LOG_A("min:%u max:%u\n",Min ,Max);
 
-    // test Min/Max against fixed levels
-    if (Min >= 3055 ) return PILOT_12V;                                     // Pilot at 12V (min 11.0V)
-    if ((Min >= 2735) && (Max < 3055)) return PILOT_9V;                     // Pilot at 9V
-    if ((Min >= 2400) && (Max < 2735)) return PILOT_6V;                     // Pilot at 6V
-    if ((Min >= 2000) && (Max < 2400)) return PILOT_3V;                     // Pilot at 3V
-    if ((Min >= 1600) && (Max < 2000)) return PILOT_SHORT;                  // Pilot short or open
-    if ((Min > 100) && (Max < 300)) return PILOT_DIODE;                     // Diode Check OK
-    return PILOT_NOK;                                                       // Pilot NOT ok
+    // Threshold lookup shared with the native test harness — see
+    // firmware_core.cpp :: evse::decode_pilot(). Same thresholds as the
+    // historical inline table (3055/2735/2400/2000/1600/100 mV).
+    return evse_decode_pilot_mv(Min, Max);
 }
 
 
@@ -802,20 +772,12 @@ char IsCurrentAvailable(void) {
 
     // Allow solar Charging if surplus current is above 'StartCurrent' (sum of all phases)
     // Charging will start after the timeout (chargedelay) period has ended
-     // Only when StartCurrent configured or Node MinCurrent detected or Node inactive
-    if (Mode == MODE_SOLAR) {                                                   // no active EVSE yet?
-        if (ActiveEVSE == 0 && Isum >= ((signed int)StartCurrent *-10)) {
-            _LOG_D("No current available StartCurrent line %d. ActiveEVSE=%u, TotalCurrent=%d.%dA, StartCurrent=%uA, Isum=%d.%dA, ImportCurrent=%uA.\n", __LINE__, ActiveEVSE, TotalCurrent/10, abs(TotalCurrent%10), StartCurrent, Isum/10, abs(Isum%10), ImportCurrent);
-            return 0;
-        }
-        else if ((ActiveEVSE * MinCurrent * 10) > TotalCurrent) {               // check if we can split the available current between all active EVSE's
-            _LOG_D("No current available StartCurrent line %d. ActiveEVSE=%u, TotalCurrent=%d.%dA, StartCurrent=%uA, Isum=%d.%dA, ImportCurrent=%uA.\n", __LINE__, ActiveEVSE, TotalCurrent/10, abs(TotalCurrent%10), StartCurrent, Isum/10, abs(Isum%10), ImportCurrent);
-            return 0;
-        }
-        else if (ActiveEVSE > 0 && Isum > ((signed int)ImportCurrent * 10) + TotalCurrent - (ActiveEVSE * MinCurrent * 10)) {
-            _LOG_D("No current available StartCurrent line %d. ActiveEVSE=%u, TotalCurrent=%d.%dA, StartCurrent=%uA, Isum=%d.%dA, ImportCurrent=%uA.\n", __LINE__, ActiveEVSE, TotalCurrent/10, abs(TotalCurrent%10), StartCurrent, Isum/10, abs(Isum%10), ImportCurrent);
-            return 0;
-        }
+    // Only when StartCurrent configured or Node MinCurrent detected or Node inactive
+    uint8_t solar_admission = evse_decide_solar_admission(
+        Mode, ActiveEVSE, Isum, StartCurrent, MinCurrent, ImportCurrent, TotalCurrent);
+    if (solar_admission != 0) {
+        _LOG_D("No current available StartCurrent reason=%u. ActiveEVSE=%u, TotalCurrent=%d.%dA, StartCurrent=%uA, Isum=%d.%dA, ImportCurrent=%uA.\n", solar_admission, ActiveEVSE, TotalCurrent/10, abs(TotalCurrent%10), StartCurrent, Isum/10, abs(Isum%10), ImportCurrent);
+        return 0;
     }
 
     ActiveEVSE++;                                                           // Do calculations with one more EVSE
@@ -925,23 +887,21 @@ void CalcBalancedCurrent(char mod) {
     } //end MODE_NORMAL
     else { // start MODE_SOLAR || MODE_SMART
         if (Mode == MODE_SOLAR && State == STATE_B) {
-            // Prepare for switching to state C
+            // Prepare for switching to state C. _LOG_D is unconditional at
+            // this level; the helper only covers the EnableC2==AUTO sub-block.
             _LOG_D("waiting for Solar (B) Isum=%d dA, phases=%d\n", Isum, Nr_Of_Phases_Charging);
-            if (EnableC2 == AUTO) {
-                // Mains isn't loaded, so the Isum must be negative for solar charging
-                // determine if enough current is available for 3-phase or 1-phase charging
-                // TODO: deal with strong fluctuations in startup
-                if (-Isum >= (30*MinCurrent+30)) { // 30x for 3-phase and 0.1A resolution; +30 to have 3x1.0A room for regulation
-                    if (Nr_Of_Phases_Charging != 3) {
-                        Switching_Phases_C2 = GOING_TO_SWITCH_3P;
-                        _LOG_D("Solar starting in 3-phase mode\n");
-                    }    
-                } else /*if (-Isum >= (10*MinCurrent+2))*/ {
-                    if (Nr_Of_Phases_Charging != 1) {
-                        Switching_Phases_C2 = GOING_TO_SWITCH_1P;
-                        _LOG_D("Solar starting in 1-phase mode\n");
-                    }  
-                }
+            // Mains isn't loaded, so the Isum must be negative for solar charging
+            // determine if enough current is available for 3-phase or 1-phase charging
+            // TODO: deal with strong fluctuations in startup
+            uint8_t solar_start = evse_decide_solar_start_phase(
+                Mode, State, static_cast<uint8_t>(EnableC2),
+                Isum, MinCurrent, Nr_Of_Phases_Charging);
+            if (solar_start == 1) {
+                Switching_Phases_C2 = GOING_TO_SWITCH_3P;
+                _LOG_D("Solar starting in 3-phase mode\n");
+            } else if (solar_start == 2) {
+                Switching_Phases_C2 = GOING_TO_SWITCH_1P;
+                _LOG_D("Solar starting in 1-phase mode\n");
             }
         }
        
@@ -985,26 +945,10 @@ void CalcBalancedCurrent(char mod) {
         {
             IsumImport = Isum - (10 * ImportCurrent);                           // Allow Import of power from the grid when solar charging
             // when there is NO charging, do not change the setpoint (IsetBalanced); except when we are in Master/Slave configuration
-            if (ActiveEVSE > 0 && Idifference > 0) {                            // so we had some room for power as far as MaxCircuit and MaxMains are concerned
-                if (phasesLastUpdateFlag) {                                     // only increase or decrease current if measurements are updated.
-                    if (IsumImport < 0) {
-                        // negative, we have surplus (solar) power available
-                        if (IsumImport < -10 && Idifference > 10)
-                            IsetBalanced = IsetBalanced + 5;                        // more then 1A available, increase Balanced charge current with 0.5A
-                        else
-                            IsetBalanced = IsetBalanced + 1;                        // less then 1A available, increase with 0.1A
-                    } else {
-                        // positive, we use more power then is generated
-                        if (IsumImport > 20)
-                            IsetBalanced = IsetBalanced - (IsumImport / 2);         // we use atleast 2A more then available, decrease Balanced charge current.
-                        else if (IsumImport > 10)
-                            IsetBalanced = IsetBalanced - 5;                        // we use 1A more then available, decrease with 0.5A
-                        else if (IsumImport > 3)
-                            IsetBalanced = IsetBalanced - 1;                        // we still use > 0.3A more then available, decrease with 0.1A
-                                                                                    // if we use <= 0.3A we do nothing
-                    }
-                }
-            }                                                                   // we already corrected Isetbalance in case of NOT enough power MaxCircuit/MaxMains
+            IsetBalanced += evse_decide_solar_iset_balanced_delta_dA(
+                ActiveEVSE, Idifference, IsumImport,
+                phasesLastUpdateFlag ? 1 : 0);
+                                                                                // we already corrected Isetbalance in case of NOT enough power MaxCircuit/MaxMains
             _LOG_V("Checkpoint 3 Solar Isetbalanced=%d.%d A, IsumImport=%d.%d, Isum=%d.%d, ImportCurrent=%u.\n", IsetBalanced/10, abs(IsetBalanced%10), IsumImport/10, abs(IsumImport%10), Isum/10, abs(Isum%10), ImportCurrent);
         } //end MODE_SOLAR
         else { // MODE_SMART

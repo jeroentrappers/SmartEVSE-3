@@ -1,0 +1,12 @@
+# /Set/MainsMeter accept path — an EM_API-configured mains meter on
+# master/standalone accepts three signed deci-amp values separated by
+# ':'. The helper returns them untouched; the harness writes them into
+# the Core inputs (converting dA → A) so subsequent state decisions see
+# the externally-fed mains.
+#
+# 100:-50:200 → L1=+10.0 A, L2=-5.0 A (exported back to grid), L3=+20.0 A.
+# Snapshot's `mains` array confirms the values landed.
+steps:
+  - {"cmd": "reset"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/MainsMeter", "payload": "100:-50:200"}
+  - {"cmd": "snapshot"}

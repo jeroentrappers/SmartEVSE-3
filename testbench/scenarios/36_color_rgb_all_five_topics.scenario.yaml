@@ -1,0 +1,13 @@
+# /Set/Color{Off,Normal,Smart,Solar,Custom} accept path — five topics
+# share one evse::limits::decide_color_rgb helper. Each admitted
+# "R,G,B" triple lands in its own ColorXxx[3] slot; snapshot surfaces
+# all five slots so per-topic routing is visible. Verifies that one
+# helper correctly fans out to five distinct destination arrays.
+steps:
+  - {"cmd": "reset"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/ColorOff",    "payload": "10,20,30"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/ColorNormal", "payload": "40,50,60"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/ColorSmart",  "payload": "70,80,90"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/ColorSolar",  "payload": "0,0,0"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/ColorCustom", "payload": "255,255,255"}
+  - {"cmd": "snapshot"}

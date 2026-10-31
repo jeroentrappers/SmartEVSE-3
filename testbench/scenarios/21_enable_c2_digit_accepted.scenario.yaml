@@ -1,0 +1,8 @@
+# /Set/EnableC2 digit path — sending "3" selects "Always On" (index 3
+# in main.cpp::StrEnableC2). Snapshot shows enable_c2 flip from the
+# default 0 (Not present) to 3.
+steps:
+  - {"cmd": "reset"}
+  - {"cmd": "snapshot"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/EnableC2", "payload": "3"}
+  - {"cmd": "snapshot"}

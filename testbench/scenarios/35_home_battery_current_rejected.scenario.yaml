@@ -1,0 +1,16 @@
+# /Set/HomeBatteryCurrent reject paths:
+#   slave (LoadBl>=2) : refuses any payload
+#   "garbage"         : non-numeric — legacy silently wrote 0, tightened to reject (FEEDBACK §10)
+#   ""                : empty — same
+# Seed a valid value first (42 dA) so the snapshot after rejects proves
+# no drift.
+steps:
+  - {"cmd": "reset"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/HomeBatteryCurrent", "payload": "42"}
+  - {"cmd": "snapshot"}
+  - {"cmd": "set_load_balance", "role": 2}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/HomeBatteryCurrent", "payload": "100"}
+  - {"cmd": "set_load_balance", "role": 0}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/HomeBatteryCurrent", "payload": "garbage"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/HomeBatteryCurrent", "payload": ""}
+  - {"cmd": "snapshot"}

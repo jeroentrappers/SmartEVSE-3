@@ -1,0 +1,15 @@
+# Pinned version of the vendored Cesanta Mongoose library (mongoose.c +
+# mongoose.h). These two files are dropped in verbatim from the upstream
+# amalgamated release — cesanta distributes mongoose as a single-file
+# library, so vendoring (not submoduling) matches their intended model.
+#
+# See ../update_mongoose.sh to verify or upgrade.
+#
+# Upstream:   https://github.com/cesanta/mongoose
+# License:    GPL-2.0-only OR commercial (see file headers)
+
+tag                = 7.17
+commit             = 0a86bc0af22173b8c952c11551a067fd6f843d83
+pulled_at          = 2026-04-21
+sha256_mongoose_c  = 7b4f8be20532af5cb1f75bb639b760900a7f1e6a18c0e1182b265ed9d189c39f
+sha256_mongoose_h  = 750ecb7cd5100fe85106968b60004f428cdcf9bc8a75370ece41cc45540f305b

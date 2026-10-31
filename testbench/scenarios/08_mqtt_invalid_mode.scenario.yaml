@@ -1,0 +1,11 @@
+# A malformed payload on .../Set/Mode must be dropped silently — no
+# echo publish, no state change. Accepting "Bogus" (or worse,
+# partially-matching prefixes) would let a misconfigured MQTT publisher
+# put the charger in an undefined mode.
+#
+# The mqtt_rx event proves the message was received; the absence of a
+# matching mqtt_publish to .../Mode proves it was rejected.
+steps:
+  - {"cmd": "reset"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/Mode", "payload": "Bogus"}
+  - {"cmd": "tick", "ms": 10}

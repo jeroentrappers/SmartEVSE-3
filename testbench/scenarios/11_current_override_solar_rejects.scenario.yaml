@@ -1,0 +1,13 @@
+# Override is only meaningful when the charger is actively ramping to a
+# setpoint (Mode=Normal or Smart). In Solar mode the current is derived
+# from PV excess, so accepting an override would undermine the mode.
+# In Off, the charger isn't charging at all. Firmware rejects both.
+#
+# Pins esp32.cpp::mqtt_receive_callback /Set/CurrentOverride:
+# `(Mode == MODE_NORMAL || Mode == MODE_SMART)` guard.
+steps:
+  - {"cmd": "reset"}
+  - {"cmd": "set_mode", "mode": "Solar"}
+  - {"cmd": "snapshot"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/CurrentOverride", "payload": "100"}
+  - {"cmd": "tick", "ms": 100}

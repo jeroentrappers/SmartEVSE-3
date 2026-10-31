@@ -1,0 +1,13 @@
+# LoadBl >= 2 means this unit is a slave in a load-balancing cluster.
+# The master is the authoritative source of OverrideCurrent; slaves must
+# reject any direct /Set/CurrentOverride to prevent split-brain.
+#
+# Pins esp32.cpp::mqtt_receive_callback /Set/CurrentOverride: `LoadBl < 2`
+# guard. Golden shows no mqtt_publish echo — silent drop.
+steps:
+  - {"cmd": "reset"}
+  - {"cmd": "set_mode", "mode": "Smart"}
+  - {"cmd": "set_load_balance", "role": 2}
+  - {"cmd": "snapshot"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/CurrentOverride", "payload": "100"}
+  - {"cmd": "tick", "ms": 100}

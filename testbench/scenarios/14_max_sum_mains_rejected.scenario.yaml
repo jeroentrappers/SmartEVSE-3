@@ -1,0 +1,16 @@
+# /Set/CurrentMaxSumMains rejection paths — all must leave
+# max_sum_mains_a at its starting value (0) and emit no echo.
+#   - 9 (below [10, 600])
+#   - 601 (just above range)
+#   - slave (LoadBl=2) with an in-range value
+#
+# Proves the firmware's silent-drop contract on this topic for every
+# reject arm of evse::limits::decide_max_sum_mains.
+steps:
+  - {"cmd": "reset"}
+  - {"cmd": "snapshot"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/CurrentMaxSumMains", "payload": "9"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/CurrentMaxSumMains", "payload": "601"}
+  - {"cmd": "set_load_balance", "role": 2}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/CurrentMaxSumMains", "payload": "100"}
+  - {"cmd": "snapshot"}

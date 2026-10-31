@@ -1,0 +1,15 @@
+# /Set/RFID reject paths — seed a valid 6-byte UID first, then fire
+# four reject shapes and confirm the snapshot UID is unchanged after:
+#   non-hex char ('G' at position 1)
+#   11 chars     (odd length, not in {12, 14})
+#   13 chars     (odd length, not in {12, 14})
+#   empty payload
+steps:
+  - {"cmd": "reset"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/RFID", "payload": "010203040506"}
+  - {"cmd": "snapshot"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/RFID", "payload": "0G0203040506"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/RFID", "payload": "01020304050"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/RFID", "payload": "0102030405060"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/RFID", "payload": ""}
+  - {"cmd": "snapshot"}

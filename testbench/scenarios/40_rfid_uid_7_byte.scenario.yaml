@@ -1,0 +1,7 @@
+# /Set/RFID — 14 hex chars → 7-byte UID (no family prefix, UID occupies
+# uid[0..6], Dallas CRC-8 at uid[7]). Payload 04A1B2C3D4E5F6 lands as
+# 04 A1 B2 C3 D4 E5 F6 46.
+steps:
+  - {"cmd": "reset"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/RFID", "payload": "04A1B2C3D4E5F6"}
+  - {"cmd": "snapshot"}

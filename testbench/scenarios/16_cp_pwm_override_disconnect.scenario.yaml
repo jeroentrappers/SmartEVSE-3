@@ -1,0 +1,10 @@
+# /Set/CPPWMOverride with payload=0 — force-disconnect the pilot. This
+# is the "emergency open" path: firmware writes duty=0 (no PWM, pilot
+# rail pulled low), PILOT_DISCONNECTED, CPDutyOverride=true. Note this
+# is Apply with value=0, NOT Clear — the decision helper distinguishes
+# "release the override" (-1) from "override to zero" (0).
+steps:
+  - {"cmd": "reset"}
+  - {"cmd": "snapshot"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/CPPWMOverride", "payload": "0"}
+  - {"cmd": "snapshot"}

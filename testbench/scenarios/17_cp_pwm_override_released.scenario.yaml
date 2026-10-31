@@ -1,0 +1,12 @@
+# /Set/CPPWMOverride with payload=-1 — release an active override. Two
+# MQTT messages: first 512 to engage the override, then -1 to release.
+# The release path goes through the Clear arm: firmware calls
+# SetCPDuty(1024) (full duty = pilot held steady high), PILOT_CONNECTED,
+# CPDutyOverride=false. The snapshot's cp_pwm_override field returns
+# to -1 (sentinel "no override active").
+steps:
+  - {"cmd": "reset"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/CPPWMOverride", "payload": "512"}
+  - {"cmd": "snapshot"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/CPPWMOverride", "payload": "-1"}
+  - {"cmd": "snapshot"}

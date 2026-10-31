@@ -1,0 +1,10 @@
+# /Set/CPPWMOverride Apply path — a mid-range 1024-scale duty.
+# Sending 512 (= 50% raw duty) forces the firmware to SetCPDuty(512),
+# PILOT_CONNECTED, CPDutyOverride=true. The harness emits the pwm event
+# (converted to percent: 512*100/1024 = 50) and pilot event so the
+# override is visible to observers without having to diff snapshots.
+steps:
+  - {"cmd": "reset"}
+  - {"cmd": "snapshot"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/CPPWMOverride", "payload": "512"}
+  - {"cmd": "snapshot"}

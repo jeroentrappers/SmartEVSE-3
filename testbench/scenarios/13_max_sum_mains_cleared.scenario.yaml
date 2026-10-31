@@ -1,0 +1,8 @@
+# /Set/CurrentMaxSumMains clear path. Apply a limit first, then send "0"
+# to disable. max_sum_mains_a is observable in the snapshot.
+steps:
+  - {"cmd": "reset"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/CurrentMaxSumMains", "payload": "100"}
+  - {"cmd": "snapshot"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/CurrentMaxSumMains", "payload": "0"}
+  - {"cmd": "snapshot"}

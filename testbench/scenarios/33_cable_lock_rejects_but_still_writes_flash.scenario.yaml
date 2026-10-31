@@ -1,0 +1,17 @@
+# /Set/CableLock reject-but-flash-write path — the tightened helper
+# drops unknown payloads ("2", "true", "01", empty), but the call site
+# keeps the unconditional request_write_settings() for bit-identity,
+# so every reject still emits a flash_write event. Lock state was
+# pre-set to 1 to prove rejects don't revert it to 0.
+#
+# This is FEEDBACK §11 pinned on the wire: four unknown payloads →
+# four flash writes, zero state change.
+steps:
+  - {"cmd": "reset"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/CableLock", "payload": "1"}
+  - {"cmd": "snapshot"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/CableLock", "payload": "2"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/CableLock", "payload": "true"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/CableLock", "payload": "01"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/CableLock", "payload": ""}
+  - {"cmd": "snapshot"}
