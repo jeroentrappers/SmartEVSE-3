@@ -29,6 +29,19 @@ See the strategy doc: [`../TESTING_STRATEGY.md`](../TESTING_STRATEGY.md).
   implementation is the next step of Phase B — see
   [`../TESTING_STRATEGY.md`](../TESTING_STRATEGY.md) §Phase B.
 
+**Stale after the rebase onto dingo35 master (4c3de7a, 2026-10-17).**
+Upstream changed these code paths after the extraction, so the firmware
+uses upstream's inline code again and the extracted helpers (plus their
+scenarios) describe the April 2026 behaviour, not the firmware:
+- `evse_decide_circuit_admission` — upstream now checks MaxCircuit against a
+  separate CircuitMeter (`Baseload_Circuit`) instead of the EV meter.
+- `evse_limits_decide_mains_meter` / `evse_limits_decide_ev_meter` —
+  `Set/MainsMeter` now also accepts `L1:L2:L3:W:WH`, with a ±200 A range.
+  Scenarios 24–31 pin the old 3-field behaviour.
+
+Upstream also removed all v4 / CH32 code (`df910fb`); the extraction's v4
+branches were dropped during the rebase.
+
 ## Quick start
 
 ```bash
