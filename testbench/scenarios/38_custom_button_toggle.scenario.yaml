@@ -1,0 +1,14 @@
+# /Set/CustomButton — the legacy 2-state toggle. Exact match "On" sets
+# CustomButton=1, anything else sets CustomButton=0 (including empty,
+# mixed case, and unrelated payloads). Always Apply — no Reject path.
+steps:
+  - {"cmd": "reset"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/CustomButton", "payload": "On"}
+  - {"cmd": "snapshot"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/CustomButton", "payload": "Off"}
+  - {"cmd": "snapshot"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/CustomButton", "payload": "on"}
+  - {"cmd": "snapshot"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/CustomButton", "payload": "On"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/CustomButton", "payload": ""}
+  - {"cmd": "snapshot"}

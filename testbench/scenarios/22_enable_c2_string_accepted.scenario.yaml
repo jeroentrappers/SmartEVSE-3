@@ -1,0 +1,8 @@
+# /Set/EnableC2 string path — sending "Solar Off" selects index 2.
+# This path is legacy backwards-compat: glcd/REST-API echo back the
+# string form, so publishers that round-trip through the UI may send
+# strings rather than integers.
+steps:
+  - {"cmd": "reset"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/EnableC2", "payload": "Solar Off"}
+  - {"cmd": "snapshot"}

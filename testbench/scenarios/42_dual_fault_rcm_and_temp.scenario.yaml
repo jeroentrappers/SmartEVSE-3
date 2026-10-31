@@ -1,0 +1,19 @@
+# Dual fault mid-charge: RCM and TEMP_HIGH are set on the same tick.
+# The firmware must fire *both* error edges but take the C→C1 transition
+# exactly once — a regression that double-transitions (C→C1 for RCM,
+# C1→C1 again for TEMP) would show as an extra `state` event.
+#
+# Regression target: any refactor that evaluates error flags per-bit
+# instead of once-per-tick. The `fault` boolean in tick_10ms is OR'd
+# over the whole mask for this reason.
+steps:
+  - {"cmd": "reset"}
+  - {"cmd": "set_mode", "mode": "Smart"}
+  - {"cmd": "set_mains", "l1": 5.0, "l2": 5.0, "l3": 5.0}
+  - {"cmd": "plug_ev", "connected": true}
+  - {"cmd": "tick", "ms": 500}
+  - {"cmd": "set_pilot_mv", "mv": 6000}
+  - {"cmd": "tick", "ms": 500}
+  - {"cmd": "rcm_trip"}
+  - {"cmd": "set_temp_c", "temp": 70.0}
+  - {"cmd": "tick", "ms": 100}

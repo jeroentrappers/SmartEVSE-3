@@ -1,0 +1,12 @@
+# /Set/HomeBatteryCurrent accept path — signed int16 in deci-amps.
+# Covers positive (charging from battery), negative (exporting to
+# battery), and int16 saturation at ±32767. No LoadBl ≥ 2 since this
+# scenario runs on master/standalone.
+steps:
+  - {"cmd": "reset"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/HomeBatteryCurrent", "payload": "120"}
+  - {"cmd": "snapshot"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/HomeBatteryCurrent", "payload": "-75"}
+  - {"cmd": "snapshot"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/HomeBatteryCurrent", "payload": "99999"}
+  - {"cmd": "snapshot"}

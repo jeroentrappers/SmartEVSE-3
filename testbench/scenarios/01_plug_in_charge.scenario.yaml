@@ -1,0 +1,13 @@
+# Plug in an EV in Smart mode, advance the pilot to state C, expect the
+# contactor to close within a second. First entry in the safety corpus.
+#
+# Authored against the mock backend. Re-record against the real firmware
+# in Phase B and lock the resulting event stream as golden.
+steps:
+  - {"cmd": "reset"}
+  - {"cmd": "set_mode", "mode": "Smart"}
+  - {"cmd": "set_mains", "l1": 5.0, "l2": 5.0, "l3": 5.0}
+  - {"cmd": "plug_ev", "connected": true}
+  - {"cmd": "tick", "ms": 500}
+  - {"cmd": "set_pilot_mv", "mv": 6000}
+  - {"cmd": "tick", "ms": 1000}

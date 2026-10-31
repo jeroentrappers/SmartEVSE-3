@@ -1,0 +1,13 @@
+# /Set/EVMeter partial-apply path — each of the three arms gates
+# independently, driven by -1 sentinels:
+#   - currents only  : "50:60:70:-1:-1"  → flags=1
+#   - power only     : "-1:-1:-1:2500:-1" → flags=2
+#   - energy only    : "-1:-1:-1:-1:99"  → flags=4
+# The snapshot after each publish should show only that arm's values
+# having moved from their defaults.
+steps:
+  - {"cmd": "reset"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/EVMeter", "payload": "50:60:70:-1:-1"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/EVMeter", "payload": "-1:-1:-1:2500:-1"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/EVMeter", "payload": "-1:-1:-1:-1:99"}
+  - {"cmd": "snapshot"}

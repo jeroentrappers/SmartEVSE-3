@@ -1,0 +1,27 @@
+# MQTT CurrentOverride rejection: a hostile or misconfigured MQTT
+# publisher sending 99999 deci-amps on .../Set/CurrentOverride must be
+# **rejected silently** — the firmware does not clamp, it drops.
+#
+# Matches esp32.cpp::mqtt_receive_callback /Set/CurrentOverride, which
+# only accepts values in [MinCurrent*10, MaxCurrent*10] when LoadBl<2
+# and Mode is Normal or Smart. Out-of-range requests do not update
+# OverrideCurrent and do not generate an echo publish.
+#
+# Consequence for the EV: the charger continues to advertise its
+# default MaxCurrent (16 A) — proof that a bad MQTT payload cannot
+# coerce the charger into advertising a higher current.
+#
+# Contract pinned by this scenario (plus scenario 09 for happy path):
+#   1. Out-of-range OverrideCurrent → no mqtt_publish echo.
+#   2. Advertised current stays at MaxCurrent default (16 A).
+#
+# Corpus-wide invariant §4.2 from TESTING_STRATEGY.md.
+steps:
+  - {"cmd": "reset"}
+  - {"cmd": "set_mode", "mode": "Smart"}
+  - {"cmd": "set_mains", "l1": 5.0, "l2": 5.0, "l3": 5.0}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/CurrentOverride", "payload": "99999"}
+  - {"cmd": "plug_ev", "connected": true}
+  - {"cmd": "tick", "ms": 500}
+  - {"cmd": "set_pilot_mv", "mv": 6000}
+  - {"cmd": "tick", "ms": 1000}

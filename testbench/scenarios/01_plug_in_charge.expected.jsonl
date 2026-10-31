@@ -1,0 +1,14 @@
+{"t":0,"kind":"boot","version":"native-0.1.0","prefix":"SmartEVSE-12345"}
+{"t":0,"kind":"snapshot","state":"A","mode":"Smart","pilot_mv":12000,"ev_connected":false,"contactor":[false,false,false],"pwm_duty":100,"errors":[],"charge_current_a":0,"override_current_a":0,"max_current_a":16,"max_mains_a":25,"max_sum_mains_a":0,"cp_pwm_override":-1,"enable_c2":0,"mains_meter_em_api":true,"ev_meter_em_api":true,"ev_meter":{"l1_dA":0,"l2_dA":0,"l3_dA":0,"power_w":0,"energy_wh":0},"cable_lock":0,"home_battery_current_dA":0,"colors":{"off":[0,0,0],"normal":[0,0,0],"smart":[0,0,0],"solar":[0,0,0],"custom":[0,0,0]},"custom_button":0,"rfid_uid":"0000000000000000","rfid_reader_enabled":true,"temp_c":25,"mains":[0,0,0]}
+{"t":0,"kind":"pwm","duty":100,"advertised_a":0}
+{"t":0,"kind":"pilot","connected":true}
+{"t":0,"kind":"reset"}
+{"t":0,"kind":"snapshot","state":"A","mode":"Smart","pilot_mv":12000,"ev_connected":false,"contactor":[false,false,false],"pwm_duty":100,"errors":[],"charge_current_a":0,"override_current_a":0,"max_current_a":16,"max_mains_a":25,"max_sum_mains_a":0,"cp_pwm_override":-1,"enable_c2":0,"mains_meter_em_api":true,"ev_meter_em_api":true,"ev_meter":{"l1_dA":0,"l2_dA":0,"l3_dA":0,"power_w":0,"energy_wh":0},"cable_lock":0,"home_battery_current_dA":0,"colors":{"off":[0,0,0],"normal":[0,0,0],"smart":[0,0,0],"solar":[0,0,0],"custom":[0,0,0]},"custom_button":0,"rfid_uid":"0000000000000000","rfid_reader_enabled":true,"temp_c":25,"mains":[0,0,0]}
+{"t":10,"kind":"pwm","duty":26,"advertised_a":16}
+{"t":10,"kind":"state","from":"A","to":"B","reason":"pilot_9v"}
+{"t":10,"kind":"mqtt_publish","topic":"SmartEVSE-12345/State","payload":"B","retain":true}
+{"t":510,"kind":"contactor","phase":1,"closed":true}
+{"t":510,"kind":"contactor","phase":2,"closed":true}
+{"t":510,"kind":"pwm","duty":26,"advertised_a":16}
+{"t":510,"kind":"state","from":"B","to":"C","reason":"pilot_6v"}
+{"t":510,"kind":"mqtt_publish","topic":"SmartEVSE-12345/State","payload":"C","retain":true}

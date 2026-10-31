@@ -1,0 +1,14 @@
+# Mode=Off invariant: an EV plugging in while the charger is Off must
+# never close the contactors, even if the car subsequently drops the
+# pilot to +6 V (ready-to-charge). Exercises the `access_on=false &&
+# mode==MODE_OFF` guard in firmware_core PILOT_6V handling.
+#
+# This is one of the top safety invariants from TESTING_STRATEGY.md §4.
+steps:
+  - {"cmd": "reset"}
+  - {"cmd": "set_mode", "mode": "Off"}
+  - {"cmd": "set_mains", "l1": 5.0, "l2": 5.0, "l3": 5.0}
+  - {"cmd": "plug_ev", "connected": true}
+  - {"cmd": "tick", "ms": 500}
+  - {"cmd": "set_pilot_mv", "mv": 6000}
+  - {"cmd": "tick", "ms": 1000}

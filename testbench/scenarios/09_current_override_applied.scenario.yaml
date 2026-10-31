@@ -1,0 +1,19 @@
+# Happy path for MQTT /Set/CurrentOverride: a valid in-range request
+# (100 dA = 10 A, within [MinCurrent*10=60, MaxCurrent*10=160]) is
+# accepted. The firmware publishes an echo on .../CurrentOverride, the
+# internal override_a is updated, and when the EV goes into C the
+# advertised current drops from 16 A (MaxCurrent default) to 10 A.
+#
+# Pairs with scenario 07 (out-of-range rejected silently) to lock the
+# full accept/reject contract of esp32.cpp::mqtt_receive_callback for
+# /Set/CurrentOverride — the first externally-reachable knob migrated to
+# the evse::limits helper.
+steps:
+  - {"cmd": "reset"}
+  - {"cmd": "set_mode", "mode": "Smart"}
+  - {"cmd": "set_mains", "l1": 0.0, "l2": 0.0, "l3": 0.0}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/CurrentOverride", "payload": "100"}
+  - {"cmd": "plug_ev", "connected": true}
+  - {"cmd": "tick", "ms": 500}
+  - {"cmd": "set_pilot_mv", "mv": 6000}
+  - {"cmd": "tick", "ms": 1000}

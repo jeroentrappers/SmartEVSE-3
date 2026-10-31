@@ -1,0 +1,17 @@
+{"t":0,"kind":"boot","version":"native-0.1.0","prefix":"SmartEVSE-12345"}
+{"t":0,"kind":"snapshot","state":"A","mode":"Smart","pilot_mv":12000,"ev_connected":false,"contactor":[false,false,false],"pwm_duty":100,"errors":[],"charge_current_a":0,"override_current_a":0,"max_current_a":16,"max_mains_a":25,"max_sum_mains_a":0,"cp_pwm_override":-1,"enable_c2":0,"mains_meter_em_api":true,"ev_meter_em_api":true,"ev_meter":{"l1_dA":0,"l2_dA":0,"l3_dA":0,"power_w":0,"energy_wh":0},"cable_lock":0,"home_battery_current_dA":0,"colors":{"off":[0,0,0],"normal":[0,0,0],"smart":[0,0,0],"solar":[0,0,0],"custom":[0,0,0]},"custom_button":0,"rfid_uid":"0000000000000000","rfid_reader_enabled":true,"temp_c":25,"mains":[0,0,0]}
+{"t":0,"kind":"pwm","duty":100,"advertised_a":0}
+{"t":0,"kind":"pilot","connected":true}
+{"t":0,"kind":"reset"}
+{"t":0,"kind":"snapshot","state":"A","mode":"Smart","pilot_mv":12000,"ev_connected":false,"contactor":[false,false,false],"pwm_duty":100,"errors":[],"charge_current_a":0,"override_current_a":0,"max_current_a":16,"max_mains_a":25,"max_sum_mains_a":0,"cp_pwm_override":-1,"enable_c2":0,"mains_meter_em_api":true,"ev_meter_em_api":true,"ev_meter":{"l1_dA":0,"l2_dA":0,"l3_dA":0,"power_w":0,"energy_wh":0},"cable_lock":0,"home_battery_current_dA":0,"colors":{"off":[0,0,0],"normal":[0,0,0],"smart":[0,0,0],"solar":[0,0,0],"custom":[0,0,0]},"custom_button":0,"rfid_uid":"0000000000000000","rfid_reader_enabled":true,"temp_c":25,"mains":[0,0,0]}
+{"t":0,"kind":"mqtt_rx","topic":"SmartEVSE-12345/Set/ColorOff","payload":"10,20,30"}
+{"t":0,"kind":"color_apply","which":"Off","r":10,"g":20,"b":30}
+{"t":0,"kind":"mqtt_rx","topic":"SmartEVSE-12345/Set/ColorNormal","payload":"40,50,60"}
+{"t":0,"kind":"color_apply","which":"Normal","r":40,"g":50,"b":60}
+{"t":0,"kind":"mqtt_rx","topic":"SmartEVSE-12345/Set/ColorSmart","payload":"70,80,90"}
+{"t":0,"kind":"color_apply","which":"Smart","r":70,"g":80,"b":90}
+{"t":0,"kind":"mqtt_rx","topic":"SmartEVSE-12345/Set/ColorSolar","payload":"0,0,0"}
+{"t":0,"kind":"color_apply","which":"Solar","r":0,"g":0,"b":0}
+{"t":0,"kind":"mqtt_rx","topic":"SmartEVSE-12345/Set/ColorCustom","payload":"255,255,255"}
+{"t":0,"kind":"color_apply","which":"Custom","r":255,"g":255,"b":255}
+{"t":0,"kind":"snapshot","state":"A","mode":"Smart","pilot_mv":12000,"ev_connected":false,"contactor":[false,false,false],"pwm_duty":100,"errors":[],"charge_current_a":0,"override_current_a":0,"max_current_a":16,"max_mains_a":25,"max_sum_mains_a":0,"cp_pwm_override":-1,"enable_c2":0,"mains_meter_em_api":true,"ev_meter_em_api":true,"ev_meter":{"l1_dA":0,"l2_dA":0,"l3_dA":0,"power_w":0,"energy_wh":0},"cable_lock":0,"home_battery_current_dA":0,"colors":{"off":[10,20,30],"normal":[40,50,60],"smart":[70,80,90],"solar":[0,0,0],"custom":[255,255,255]},"custom_button":0,"rfid_uid":"0000000000000000","rfid_reader_enabled":true,"temp_c":25,"mains":[0,0,0]}

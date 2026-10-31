@@ -1,0 +1,17 @@
+# /Set/MainsMeter reject-parse / reject-range path — four distinct
+# payloads that the helper should silently drop:
+#   "100"              : missing separators (only one number parsed)
+#   "abc:1:2"          : non-numeric first field
+#   "2000:0:0"         : upper boundary is exclusive (< 2000)
+#   "0:0:-2000"        : lower boundary is exclusive (> -2000)
+# After each reject, no mains_meter event fires; the snapshot confirms
+# the mains values haven't drifted from the pre-reject state.
+steps:
+  - {"cmd": "reset"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/MainsMeter", "payload": "50:50:50"}
+  - {"cmd": "snapshot"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/MainsMeter", "payload": "100"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/MainsMeter", "payload": "abc:1:2"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/MainsMeter", "payload": "2000:0:0"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/MainsMeter", "payload": "0:0:-2000"}
+  - {"cmd": "snapshot"}

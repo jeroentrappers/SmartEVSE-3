@@ -1,0 +1,8 @@
+# /Set/RFID — 12 hex chars → 6-byte UID. Helper adds the iButton family
+# code (0x01) as uid[0], stores UID at uid[1..6], computes Dallas CRC-8
+# at uid[7]. Final UID: 01 01 02 03 04 05 06 BD (CRC verified via
+# independent Python implementation).
+steps:
+  - {"cmd": "reset"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/RFID", "payload": "010203040506"}
+  - {"cmd": "snapshot"}

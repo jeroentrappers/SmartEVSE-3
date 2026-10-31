@@ -1,0 +1,16 @@
+# RCM (residual current monitor) trips while the vehicle is actively
+# charging. The firmware must take the contactor open path — state
+# C → C1 (fault) → B1 (fault) — and publish the error. If this test
+# ever goes red on a refactor, a residual-current fault is no longer
+# reliably cutting charge current. Top-bucket safety invariant from
+# TESTING_STRATEGY.md §4.1.
+steps:
+  - {"cmd": "reset"}
+  - {"cmd": "set_mode", "mode": "Smart"}
+  - {"cmd": "set_mains", "l1": 5.0, "l2": 5.0, "l3": 5.0}
+  - {"cmd": "plug_ev", "connected": true}
+  - {"cmd": "tick", "ms": 500}
+  - {"cmd": "set_pilot_mv", "mv": 6000}
+  - {"cmd": "tick", "ms": 500}
+  - {"cmd": "rcm_trip"}
+  - {"cmd": "tick", "ms": 100}

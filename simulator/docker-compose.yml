@@ -1,0 +1,37 @@
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: smartevse-mosquitto
+    restart: unless-stopped
+    ports:
+      - "${MQTT_PORT:-1883}:1883"
+      - "${MQTT_WS_PORT:-9001}:9001"
+    volumes:
+      - ./mosquitto/config:/mosquitto/config:ro
+      - mosquitto-data:/mosquitto/data
+      - mosquitto-log:/mosquitto/log
+
+  simulator:
+    build: ./simulator
+    container_name: smartevse-simulator
+    restart: unless-stopped
+    depends_on:
+      - mosquitto
+    environment:
+      MQTT_HOST: mosquitto
+      MQTT_PORT: 1883
+      MQTT_USERNAME: ${MQTT_USERNAME:-}
+      MQTT_PASSWORD: ${MQTT_PASSWORD:-}
+      DEVICE_SERIAL: ${DEVICE_SERIAL:-12345}
+      DEVICE_VERSION: ${DEVICE_VERSION:-v3.13.0-sim}
+      SIM_TICK_SECONDS: ${SIM_TICK_SECONDS:-2}
+      INITIAL_MODE: ${INITIAL_MODE:-Smart}
+      MAX_CURRENT_A: ${MAX_CURRENT_A:-32}
+      MIN_CURRENT_A: ${MIN_CURRENT_A:-6}
+      NR_OF_PHASES: ${NR_OF_PHASES:-3}
+    ports:
+      - "8081:80"
+
+volumes:
+  mosquitto-data:
+  mosquitto-log:

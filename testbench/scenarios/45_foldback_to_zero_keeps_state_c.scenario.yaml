@@ -1,0 +1,30 @@
+# Headroom is driven all the way below the minimum: L1 spikes to 30 A
+# on a 25 A main, leaving 25 − 30 − 1 = −6 A (clamped to 0). Since
+# 0 < min_current (6 A), compute_target_current returns 0 — advertised
+# drops to 0, PWM duty goes to 1000 (pilot held at +12V, i.e. PWM off)
+# — but the charger STAYS IN STATE_C with contactors still closed.
+#
+# The rationale mirrors the legacy firmware: opening contactors on a
+# transient overcurrent would cause an audible relay slam and EV-side
+# error; instead the charger briefly "advertises zero" and lets the
+# EV stop draw on its own. As mains drops back under the limit, the
+# charge current ramps back up without a state change.
+#
+# Regression target: a refactor that treats advertised_a==0 as "end
+# session" and transitions to C1 would break this behavior. Scenario
+# 04 pins the moderate-foldback path (16 A → 9 A); this one pins the
+# extreme-foldback path (target → 0 without state change).
+steps:
+  - {"cmd": "reset"}
+  - {"cmd": "set_mode", "mode": "Smart"}
+  - {"cmd": "set_mains", "l1": 5.0, "l2": 5.0, "l3": 5.0}
+  - {"cmd": "plug_ev", "connected": true}
+  - {"cmd": "tick", "ms": 500}
+  - {"cmd": "set_pilot_mv", "mv": 6000}
+  - {"cmd": "tick", "ms": 500}
+  - {"cmd": "set_mains", "l1": 30.0, "l2": 5.0, "l3": 5.0}
+  - {"cmd": "tick", "ms": 100}
+  - {"cmd": "snapshot"}
+  - {"cmd": "set_mains", "l1": 8.0, "l2": 5.0, "l3": 5.0}
+  - {"cmd": "tick", "ms": 100}
+  - {"cmd": "snapshot"}

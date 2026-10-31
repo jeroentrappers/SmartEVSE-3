@@ -1,0 +1,9 @@
+# /Set/CurrentMaxSumMains happy path. A valid request in the [10, 600] A
+# window is applied — snapshot shows max_sum_mains_a updated, but no
+# mqtt_publish echo (this topic is silent, unlike CurrentOverride —
+# matches the firmware's behavior in esp32.cpp and pins it as contract).
+steps:
+  - {"cmd": "reset"}
+  - {"cmd": "snapshot"}
+  - {"cmd": "mqtt_set", "topic": "SmartEVSE-12345/Set/CurrentMaxSumMains", "payload": "42"}
+  - {"cmd": "snapshot"}
